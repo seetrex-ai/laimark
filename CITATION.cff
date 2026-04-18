@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use LAIMARK in your research, please cite it as below."
+type: software
+title: "LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward"
+authors:
+  - family-names: "Tabares Montilla"
+    given-names: "Jesús"
+version: 0.1.0
+date-released: 2026-04-18
+license: Apache-2.0
+url: "https://github.com/seetrex-ai/laimark"
+repository-code: "https://github.com/seetrex-ai/laimark"
+keywords:
+  - reinforcement learning
+  - verifiable reward
+  - GRPO
+  - self-generated curriculum
+  - language models
+  - RLVR
+  - Qwen3
+preferred-citation:
+  type: article
+  title: "LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward"
+  authors:
+    - family-names: "Tabares Montilla"
+      given-names: "Jesús"
+  year: 2026
+  url: "https://github.com/seetrex-ai/laimark"
