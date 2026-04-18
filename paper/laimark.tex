@@ -146,8 +146,7 @@ All experimental results reported use the official HuggingFace fp16 HumanEval ev
     uses/.style={dashed, draw=gray!45, line width=0.5pt},
     elab/.style={font=\scriptsize\itshape, text=gray!50!black, align=center,
                  inner sep=2pt, fill=white},
-    tag/.style={font=\scriptsize\bfseries, text=gray!60!black, inner sep=1pt},
-    glyph/.style={font=\footnotesize}
+    tag/.style={font=\scriptsize\bfseries, text=gray!60!black, inner sep=1pt}
 ]
 
 % --- central hub (the shared base model) ---
@@ -156,22 +155,22 @@ All experimental results reported use the official HuggingFace fp16 HumanEval ev
 % --- four components arranged around the hub ---
 \node[promptop] (prompt)  at (-4.3,  1.9)
     {\textbf{1. Prompt evolution}\\[2pt]
-     {\glyph $\mathtt{txt}\!\to\!\mathtt{txt}$}~\scriptsize evolve system prompt\\[-1pt]
+     \scriptsize $\mathtt{txt}\!\to\!\mathtt{txt}$: evolve system prompt\\[-1pt]
      \scriptsize weights unchanged};
 
 \node[weightop] (weights) at ( 4.3,  1.9)
     {\textbf{2. Weight update}\\[2pt]
-     {\glyph $\nabla\!_\theta$}~\scriptsize GRPO on\\[-1pt]
+     \scriptsize $\nabla_\theta$: GRPO on\\[-1pt]
      \scriptsize verifiable reward};
 
 \node[weightop] (selfgen) at ( 4.3, -1.9)
     {\textbf{4. Self-generated curriculum}\\[2pt]
-     {\glyph $\pi\!\to\!(x,\text{tests},\hat{y})$}~\scriptsize problems,\\[-1pt]
-     \scriptsize tests, reference sol.};
+     \scriptsize $\pi\!\to\!(x,\text{tests},\hat{y})$:\\[-1pt]
+     \scriptsize problems + tests + ref.\ sol.};
 
 \node[promptop] (refine)  at (-4.3, -1.9)
     {\textbf{3. Self-refinement}\\[2pt]
-     {\glyph $\mathtt{txt}\!\to\!\mathtt{txt}$}~\scriptsize re-enter comp.\,1\\[-1pt]
+     \scriptsize $\mathtt{txt}\!\to\!\mathtt{txt}$: re-enter comp.\,1\\[-1pt]
      \scriptsize with updated $\pi$};
 
 % --- dashed lines: each component reads/writes the shared model ---
