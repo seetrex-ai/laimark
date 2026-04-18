@@ -52,13 +52,16 @@ SYSTEM_L2B = (
 
 # === Ollama interaction ===
 
-def call_ollama(model, prompt_text, temperature=0.7, max_tokens=1024):
+def call_ollama(model, prompt_text, temperature=0.7, max_tokens=1024, seed=None):
     """Call Ollama native API to generate a solution attempt."""
     user_msg = (
         "Complete the following Python function. "
         "Return ONLY the function body, no explanation."
         f"\n\n{prompt_text}"
     )
+    options = {"temperature": temperature, "num_predict": max_tokens}
+    if seed is not None:
+        options["seed"] = seed
     payload = {
         "model": model,
         "messages": [
@@ -67,7 +70,7 @@ def call_ollama(model, prompt_text, temperature=0.7, max_tokens=1024):
         ],
         "think": False,
         "stream": False,
-        "options": {"temperature": temperature, "num_predict": max_tokens},
+        "options": options,
     }
     try:
         r = requests.post(OLLAMA_API, json=payload, timeout=120)
@@ -172,7 +175,12 @@ def main():
     parser.add_argument("--jaccard_threshold", type=float, default=0.6,
                         help="Jaccard similarity threshold for dedup")
     parser.add_argument("--resume", action="store_true", help="Skip already calibrated problems")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Base seed for Ollama sampling (each sample uses seed + k)")
     args = parser.parse_args()
+
+    import random
+    random.seed(args.seed)
 
     # Load candidates
     if not os.path.exists(args.input):
@@ -253,7 +261,9 @@ def main():
         # === Sample K solutions and compute pass rate ===
         passes = 0
         for k in range(args.samples):
-            completion = call_ollama(args.model, problem["prompt"], temperature=0.7)
+            sample_seed = args.seed * 1000 + stats["sampled"] * 100 + k
+            completion = call_ollama(args.model, problem["prompt"],
+                                     temperature=0.7, seed=sample_seed)
             if not completion:
                 continue
             if check_solution(completion, problem["prompt"], problem["tests"]):
@@ -318,11 +328,11 @@ def main():
 
         if pass_rates:
             avg_pr = sum(pass_rates) / len(pass_rates)
-            log(f"\nPass rate distribution (accepted):")
+            log("\nPass rate distribution (accepted):")
             log(f"  Mean: {avg_pr:.2f}")
             log(f"  Min:  {min(pass_rates):.2f}")
             log(f"  Max:  {max(pass_rates):.2f}")
-            log(f"\nTopic distribution:")
+            log("\nTopic distribution:")
             for t, count in sorted(topics.items(), key=lambda x: -x[1]):
                 log(f"  {t}: {count}")
 

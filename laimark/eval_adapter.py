@@ -15,15 +15,12 @@ import json
 import os
 import re
 import signal
-import sys
-import tempfile
 import time
 
 import torch
 from datasets import load_dataset
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
 
 MODEL_ID = "Qwen/Qwen3-8B"
 
@@ -103,7 +100,13 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=2048)
     parser.add_argument("--system_prompt", default=None,
                         help="Override system prompt (default: SYSTEM_L2B)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed (greedy decoding is already deterministic; kept for safety)")
     args = parser.parse_args()
+
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
 
     # Load model
     print(f"Loading base model: {args.base_model}")

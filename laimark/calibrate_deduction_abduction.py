@@ -21,7 +21,6 @@ import tempfile
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-
 SYSTEM_L2B = (
     "Solve problems using structured algorithmic thinking. Initialize result "
     "containers explicitly before processing. When filtering or transforming "
@@ -115,7 +114,7 @@ def main():
     parser.add_argument("--hi", type=float, default=0.8)
     args = parser.parse_args()
 
-    print(f"=== Calibrate deduction/abduction ===")
+    print("=== Calibrate deduction/abduction ===")
     print(f"Model: {args.model}")
     if args.adapter:
         print(f"Adapter: {args.adapter}")
@@ -131,7 +130,7 @@ def main():
 
     if args.adapter:
         from peft import PeftModel
-        print(f"Merging adapter...")
+        print("Merging adapter...")
         model = PeftModel.from_pretrained(model, args.adapter)
         model = model.merge_and_unload()
 

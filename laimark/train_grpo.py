@@ -19,18 +19,12 @@ import argparse
 import json
 import multiprocessing
 import os
-import signal
-import sys
-import tempfile
-import traceback
-from functools import partial
 
 import torch
 from datasets import Dataset, load_dataset
 from peft import LoraConfig, TaskType
 from transformers import AutoTokenizer
 from trl import GRPOConfig, GRPOTrainer
-
 
 MODEL_ID = "Qwen/Qwen3-8B"
 
@@ -58,8 +52,6 @@ SYSTEM_GENERIC = "You are an expert Python programmer. Write clean, correct code
 def _run_code_in_process(code_str, timeout=5):
     """Execute code in a subprocess with timeout. Returns True if no exception."""
     try:
-        result = {"passed": False}
-
         def target(code, res):
             try:
                 exec(code, {})
@@ -187,7 +179,7 @@ def code_reward_fn(completions, problem_type, **kwargs):
                 passed = _check_abduction(comp_text, code, func_name, expected)
             else:
                 passed = False
-        except Exception as e:
+        except Exception:
             passed = False
 
         rewards.append(1.0 if passed else 0.0)
@@ -284,8 +276,11 @@ def build_dataset(selfgen_only=False, selfgen_file=None, weighted=False,
     examples = []
 
     if selfgen_only:
-        if not selfgen_file or not os.path.exists(selfgen_file):
-            raise FileNotFoundError(f"selfgen_file required for --selfgen_only: {selfgen_file}")
+        if not selfgen_file:
+            default_data = os.path.join(os.path.dirname(__file__) or ".", "..", "data", "calibrated_selfgen.jsonl")
+            selfgen_file = os.path.normpath(default_data)
+        if not os.path.exists(selfgen_file):
+            raise FileNotFoundError(f"selfgen_file not found: {selfgen_file}")
         examples = _load_selfgen(selfgen_file, weighted=weighted,
                                  full_function=full_function, system_prompt=system_prompt)
         by_type = {}
@@ -360,7 +355,12 @@ def build_dataset(selfgen_only=False, selfgen_file=None, weighted=False,
     print(f"MBPP: {len([e for e in examples if e['problem_type'] == 'mbpp'])} problems")
 
     # Calibrated self-generated problems
-    sg_file = selfgen_file or os.path.join(os.path.dirname(__file__) or ".", "calibrated_all.jsonl")
+    # Default: repo_root/data/calibrated_selfgen.jsonl; falls back to no selfgen if absent.
+    if selfgen_file:
+        sg_file = selfgen_file
+    else:
+        default_data = os.path.join(os.path.dirname(__file__) or ".", "..", "data", "calibrated_selfgen.jsonl")
+        sg_file = os.path.normpath(default_data)
     if os.path.exists(sg_file):
         sg_examples = _load_selfgen(sg_file, weighted=weighted,
                                      full_function=full_function, system_prompt=system_prompt)
@@ -401,11 +401,23 @@ def main():
                         help="Ask model for complete function (not body-only). For larger models.")
     parser.add_argument("--system_prompt", default=None,
                         help="Override system prompt (default: SYSTEM_L2B)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for reproducibility (torch, numpy, random, and GRPOConfig)")
     args = parser.parse_args()
+
+    import random
+
+    import numpy as np
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
 
     sys_prompt = args.system_prompt or SYSTEM_L2B
     print(f"System prompt: {sys_prompt[:60]}...")
     print(f"Full function mode: {args.full_function}")
+    print(f"Seed: {args.seed}")
 
     print("Building dataset...")
     dataset = build_dataset(
@@ -444,6 +456,7 @@ def main():
         num_generations=args.num_generations,
         max_completion_length=args.max_completion_length,
         report_to="none",
+        seed=args.seed,
         # vLLM for fast generation
         use_vllm=not args.no_vllm,
         vllm_gpu_memory_utilization=0.4,

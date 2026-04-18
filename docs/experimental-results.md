@@ -7,7 +7,7 @@ See the [paper](../paper/laimark.tex) for full methodology and discussion.
 
 ## 1. Main Result
 
-GRPO on 33 self-generated calibrated problems reaches 76.8% pass@1 — about
+GRPO on 22 self-generated calibrated problems reaches 76.8% pass@1 — about
 65% of the 20.7-point gain that the same GRPO run produces on 664 curated
 problems from HumanEval and MBPP.
 

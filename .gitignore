@@ -48,5 +48,6 @@ laimark/adapter*/
 # Training outputs and intermediate data
 output_*/
 *.jsonl
+!data/calibrated_selfgen.jsonl
 laimark/*_results.json
 

@@ -21,10 +21,9 @@ import os
 
 import torch
 from datasets import Dataset
-from peft import LoraConfig, TaskType, get_peft_model
+from peft import LoraConfig, TaskType
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTConfig, SFTTrainer, DPOConfig, DPOTrainer
-
+from trl import DPOConfig, DPOTrainer, SFTConfig, SFTTrainer
 
 MODEL_ID = "Qwen/Qwen3-8B"
 
@@ -160,7 +159,7 @@ def main():
 
     print("Starting DPO...")
     dpo_trainer.train()
-    print(f"DPO done.")
+    print("DPO done.")
 
     # Save final model
     final_path = os.path.join(args.output, "final")

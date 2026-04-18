@@ -19,7 +19,6 @@ import json
 import os
 import random
 import re
-import signal
 import subprocess
 import sys
 import tempfile
@@ -27,7 +26,6 @@ import time
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
 
 SYSTEM_GEN = "You are an expert Python programmer who creates programming problems. /no_think"
 
@@ -467,7 +465,7 @@ def main():
     # Phase 2: Generate new problems (+ calibrate unless --proposer_only)
     if not args.calibrate_only and calibrated_count < args.target:
         if args.proposer_only:
-            log(f"\n--- Phase 2: Generating problems (proposer_only, no calibration) ---")
+            log("\n--- Phase 2: Generating problems (proposer_only, no calibration) ---")
             log(f"Target: {args.target} validated problems")
         else:
             log(f"\n--- Phase 2: Generating new problems (need {args.target - calibrated_count} more) ---")

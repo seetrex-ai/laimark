@@ -38,8 +38,11 @@ laimark/
   train_dpo.py, train_lora.py       §4 — baselines for failed approaches
   export_gguf.sh                    GGUF export for deployment
 
+data/calibrated_selfgen.jsonl       22 self-generated calibrated problems
+                                    (the curriculum loaded by --selfgen_only)
 docs/experimental-results.md        consolidated results tables
 paper/laimark.tex                   paper source (+ references.bib)
+paper/Laimark.pdf                   compiled paper
 ```
 
 ## Installation
@@ -56,23 +59,33 @@ Training and evaluation require a GPU with enough VRAM for Qwen3-8B in fp16 (we 
 
 ## Quick start
 
-One full round of the closed loop, end to end:
+Train directly on the shipped curriculum (`data/calibrated_selfgen.jsonl`, 22 problems) and evaluate:
 
 ```bash
-# 1. Generate candidate problems
-python laimark/generate_problems.py --count 1000
-
-# 2. Calibrate against the base model — keep problems in the learnability window
-python laimark/calibrate_problems.py --samples 8 --lo 0.2 --hi 0.8
-
-# 3. GRPO on the calibrated self-generated curriculum, no external benchmarks
-python laimark/train_grpo.py --selfgen_only --num_generations 4 --epochs 2
-
-# 4. Evaluate the trained adapter on HumanEval (official HF fp16 harness)
-python laimark/eval_adapter.py --adapter grpo_output/final
+python laimark/train_grpo.py --selfgen_only --num_generations 4 --epochs 2 --seed 42
+python laimark/eval_adapter.py --adapter_path ./grpo_output/final --seed 42
 ```
 
-`--num_generations` drives the result at small data volumes (paper §4). On the same 33-problem curriculum, moving from 2 to 4 gains 6.7 pass@1 points; adding more problems at `G=2` does less.
+To regenerate the curriculum from scratch, the full pipeline is:
+
+```bash
+# 1. Generate ~1000 candidate problems (Ollama local backend)
+python laimark/generate_problems.py --count 1000 --seed 42
+
+# 2. Calibrate against the base model — keep problems in the learnability window [0.2, 0.8]
+#    Roughly one candidate in ten survives verification and calibration.
+python laimark/calibrate_problems.py --samples 8 --lo 0.2 --hi 0.8 --seed 42
+
+# 3. GRPO on the calibrated self-generated curriculum, no external benchmarks
+python laimark/train_grpo.py --selfgen_only --num_generations 4 --epochs 2 --seed 42
+
+# 4. Evaluate the trained adapter on HumanEval
+python laimark/eval_adapter.py --adapter_path ./grpo_output/final --seed 42
+```
+
+Every stage accepts `--seed` (default 42) and passes it to the underlying sampler (Ollama's `seed` option, `torch.manual_seed`, `GRPOConfig.seed`). Regeneration from step 1 is deterministic up to Ollama kernel non-determinism on multi-GPU setups; the shipped `data/calibrated_selfgen.jsonl` is a snapshot of one specific run.
+
+`--num_generations` drives the result at small data volumes (paper §4). On the same 22-problem curriculum, moving from 2 to 4 gains 6.7 pass@1 points; adding more problems at `G=2` does less.
 
 ## Reproducing the paper's main numbers
 
@@ -86,7 +99,7 @@ Each of the four configurations in the paper corresponds to one pipeline run:
 | §5.2 — task-type R1 | `calibrate_deduction_abduction.py` then GRPO | 61.0% |
 | §5.3 — 32B base | `eval_adapter.py --model Qwen3-32B --full_function` | 89.0% |
 
-Trained LoRA adapters and raw output logs are not committed — the pipeline regenerates them deterministically with fixed random seeds.
+Trained LoRA adapters are not committed. Re-running the pipeline with `--seed 42` reproduces the curriculum and training trajectory; exact pass@1 parity depends on the hardware and on GPU-nondeterministic operations in PyTorch.
 
 ## Safety
 

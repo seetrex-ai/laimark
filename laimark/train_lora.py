@@ -15,14 +15,12 @@ import os
 
 import torch
 from datasets import Dataset
-from peft import LoraConfig, get_peft_model, TaskType
+from peft import LoraConfig, TaskType
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    TrainingArguments,
 )
-from trl import SFTTrainer, SFTConfig
-
+from trl import SFTConfig, SFTTrainer
 
 MODEL_ID = "Qwen/Qwen3-8B"
 

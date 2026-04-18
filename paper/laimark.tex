@@ -41,7 +41,7 @@ Independent Researcher\\
 A language model can improve itself via reinforcement learning from verifiable reward if someone supplies the problems.
 We ask what happens when the same model supplies them.
 
-On HumanEval with Qwen3-8B, a pipeline that generates candidate programming problems and keeps the ones the base model solves inconsistently produces 33 usable problems.
+On HumanEval with Qwen3-8B, a pipeline that generates candidate programming problems and keeps the ones the base model solves inconsistently produces 22 usable problems.
 GRPO on those alone raises pass@1 from 63.4\% to 76.8\%.
 The same GRPO recipe on 664 curated problems from HumanEval and MBPP reaches 84.1\%; self-generation recovers 65\% of that gain on two orders of magnitude less training data.
 
@@ -77,8 +77,8 @@ The reference point is GRPO on curated problems: applied to Qwen3-8B with 664 pr
 The empirical question is what happens when the same base model is given only its own generations and a Python interpreter as evaluator.
 
 \paragraph{What works.}
-A generation-plus-calibration pipeline that keeps only problems the base model solves some of the time but not all of the time produces 33 usable problems from a pool of 1000 candidates.
-GRPO on those 33 problems raises pass@1 from 63.4\% to 76.8\%.
+A generation-plus-calibration pipeline that keeps only problems the base model solves some of the time but not all of the time produces 22 usable problems from a pool of around 1000 candidates.
+GRPO on those 22 problems raises pass@1 from 63.4\% to 76.8\%.
 That is 65\% of the 20.7-point improvement that the same training recipe extracts from 664 curated problems, at two orders of magnitude less training data.
 A second finding cuts across the whole result: the number of rollouts per prompt in GRPO, \texttt{num\_generations}, matters more than the number of prompts at this data volume.
 Moving \texttt{num\_generations} from 2 to 4 on identical data moves pass@1 by 6.7 points.
@@ -371,7 +371,7 @@ Default settings are $G = 4$, learning rate $5 \times 10^{-6}$ with cosine decay
 All calibrated problems are equally weighted by default; a variant weighting each problem by $1 - |2\hat{p}(x) - 1|$ (maximum weight at $\hat{p} = 0.5$) yielded indistinguishable results and is not used in the reported numbers.
 
 $G$ is the hyperparameter whose effect dominates the results at small data volumes.
-Section~\ref{sec:main} reports that shifting from $G = 2$ to $G = 4$ on the same 33-problem selfgen curriculum moves pass@1 from 70.1\% to 76.8\%, a gain comparable to adding several hundred curated problems.
+Section~\ref{sec:main} reports that shifting from $G = 2$ to $G = 4$ on the same selfgen curriculum moves pass@1 from 70.1\% to 76.8\%, a gain comparable to adding several hundred curated problems.
 
 \subsection{Evaluation protocol}
 \label{sec:method-eval}

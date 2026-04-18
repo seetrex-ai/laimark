@@ -75,7 +75,10 @@ TOPICS = [
 DIFFICULTIES = ["hard", "very hard"]
 
 
-def call_ollama(model, user_msg, temperature=0.9, max_tokens=1500):
+def call_ollama(model, user_msg, temperature=0.9, max_tokens=1500, seed=None):
+    options = {"temperature": temperature, "num_predict": max_tokens}
+    if seed is not None:
+        options["seed"] = seed
     payload = {
         "model": model,
         "messages": [
@@ -84,13 +87,13 @@ def call_ollama(model, user_msg, temperature=0.9, max_tokens=1500):
         ],
         "think": False,
         "stream": False,
-        "options": {"temperature": temperature, "num_predict": max_tokens},
+        "options": options,
     }
     try:
         r = requests.post(OLLAMA_API, json=payload, timeout=120)
         r.raise_for_status()
         return r.json()["message"]["content"].strip()
-    except Exception as e:
+    except Exception:
         return ""
 
 
@@ -151,7 +154,7 @@ def validate_problem(problem, timeout=5):
     except Exception:
         try:
             os.unlink(tmpfile)
-        except:
+        except Exception:
             pass
         return False
 
@@ -168,7 +171,12 @@ def main():
     parser.add_argument("--model", default="qwen3-8b-laimark")
     parser.add_argument("--output", default=DEFAULT_OUTPUT,
                         help="Output file for generated problems")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Seed for topic/difficulty choices and Ollama sampling")
     args = parser.parse_args()
+
+    import random
+    random.seed(args.seed)
 
     OUTPUT_FILE = args.output
 
@@ -183,12 +191,10 @@ def main():
     try:
         requests.get("http://localhost:11434/api/tags", timeout=5)
         log("Ollama OK")
-    except:
+    except Exception:
         log("ERROR: Ollama not running")
         sys.exit(1)
 
-    import random
-    generated = existing
     attempts = 0
     valid = existing
     t_start = time.time()
@@ -199,7 +205,7 @@ def main():
         difficulty = random.choice(DIFFICULTIES)
 
         prompt = GENERATE_PROMPT.format(topic=topic, difficulty=difficulty)
-        raw = call_ollama(args.model, prompt, temperature=0.9)
+        raw = call_ollama(args.model, prompt, temperature=0.9, seed=args.seed + attempts)
 
         if not raw:
             continue
