@@ -36,64 +36,72 @@ Independent Researcher\\
 
 % ==========================================================
 \begin{abstract}
-Reinforcement learning from verifiable reward (RLVR), as used in \textsc{DeepSeek-R1} and related systems, relies on curated external benchmarks of problems paired with automatic evaluators.
-We ask whether the same model can generate its own calibrated curriculum and recover the gains of external benchmarks via GRPO.
-On HumanEval with Qwen3-8B, a self-generation pipeline produces candidate programming problems with reference solutions and unit tests, and retains only those in the learnability window (solved some but not all of the time by the base model).
-GRPO trained on tens of self-generated problems reaches 76.8\% pass@1 (vs.\ 63.4\% base), capturing roughly 65\% of the gain obtained by the same method on hundreds of curated problems from HumanEval and MBPP (84.1\%).
-We then document three structural limits that cap this approach as a route to continued self-improvement.
-\textbf{(1) Iteration does not accumulate}: a second GRPO round on problems calibrated against the first-round checkpoint fails to improve over it---the checkpoint dominates the problems it helped select.
-\textbf{(2) Task-type imbalance destroys transfer}: a curriculum with $\sim$84\% abduction-style problems drops pass@1 to 61.0\% on inductive HumanEval, below the pre-training baseline.
-\textbf{(3) Self-generation becomes inapplicable at scale}: with Qwen3-32B (89.0\% pass@1 without training), less than 1\% of generated medium problems and 0\% of hard problems pass calibration---a generator-solver pair capable of producing well-formed verified problems is also capable of solving them.
-A per-problem analysis further shows that approximately 80\% of GRPO's improvement on calibrated problems is formatting (code indentation) rather than new reasoning capability.
-These results position self-generated curricula as a regularizer effective when the base model has substantial room to grow, not a route to closed-loop improvement at scale.
+A language model can improve itself via reinforcement learning from verifiable reward if someone supplies the problems.
+We ask what happens when the same model supplies them.
+
+On HumanEval with Qwen3-8B, a pipeline that generates candidate programming problems and keeps the ones the base model solves inconsistently produces 33 usable problems.
+GRPO on those alone raises pass@1 from 63.4\% to 76.8\%.
+The same GRPO recipe on 664 curated problems from HumanEval and MBPP reaches 84.1\%; self-generation recovers 65\% of that gain on two orders of magnitude less training data.
+
+Three limits cap the approach.
+Iteration does not accumulate: a second GRPO round on problems calibrated against the first-round checkpoint converges back to it, because training on those problems raises the checkpoint's pass rate on them to 1.
+A curriculum dominated by a single task type---84\% abduction in our experiment---drops pass@1 to 61.0\%, below the pre-training baseline, by shifting the output-format prior away from what HumanEval rewards.
+At 32B parameters the learnability window closes entirely: the base model solves essentially every problem it can formulate with a verified reference solution, so calibration has nothing left to accept.
+
+A per-problem inspection of the 8B checkpoint shows that eight of ten cases where the trained adapter beats its base are indentation fixes on code the base already writes correctly.
+One case is a genuine reasoning gain.
+GRPO at this scale teaches the model to format its answers for the evaluator; new reasoning is the minority component.
+The same closed-loop structure that makes self-generation cost-free is what caps it.
 \end{abstract}
 
 % ==========================================================
 \section{Introduction}
 \label{sec:intro}
 
-Reinforcement learning from verifiable reward (RLVR) has become a dominant post-training technique for language models with reasoning requirements.
-\textsc{DeepSeek-R1}~\citep{deepseek2025r1} demonstrated that on problems with automatic evaluators---mathematical proofs, unit-tested programs, multiple-choice answers---reinforcement learning with Group Relative Policy Optimization (GRPO)~\citep{shao2024grpo} can elicit substantial reasoning capability from a pretrained base model without human preference data.
-Subsequent work has shown that the same technique, applied at scale, improves code generation, mathematical reasoning, and formal verification benchmarks by orders of magnitude more than the pretraining signal alone would suggest.
+Reinforcement learning from verifiable reward (RLVR) has become the dominant post-training technique for language models on reasoning benchmarks.
+\textsc{DeepSeek-R1}~\citep{deepseek2025r1} showed that Group Relative Policy Optimization (GRPO)~\citep{shao2024grpo} can elicit substantial reasoning capability from a pretrained base, provided each problem has an automatic evaluator: mathematical proofs, unit-tested programs, multiple-choice answers.
+Every such system depends on the same input: a curated set of problems, written and verified by humans.
+HumanEval~\citep{chen2021codex}, MBPP~\citep{austin2021mbpp}, GSM8K~\citep{cobbe2021training}, MATH.
+The evaluators are cheap to run; the problems they evaluate are not free.
 
-Every such system so far depends on a \emph{curated external curriculum}: benchmarks of problems, assembled and verified by humans, that serve as the training distribution.
-HumanEval~\citep{chen2021codex}, MBPP~\citep{austin2021mbpp}, and their successors provide the programming problems; GSM8K~\citep{cobbe2021training} and MATH provide the mathematics.
-The automatic evaluators (unit tests, answer checkers) are cheap to run, but the problems themselves must be written by someone.
-This dependency has practical cost and a conceptual one: the model cannot improve on problems no one thought to write down.
+Self-generation is the obvious alternative.
+Absolute Zero Reasoner (AZR)~\citep{zhao2025azr} trains proposer and solver networks on self-generated problems with verifiable answers and reports reasoning gains without curated training data.
+The Darwin G{\"o}del Machine (DGM)~\citep{zhang2025dgm} takes a different angle: an LLM-driven agent edits its own Python source and keeps variants that improve a held-out score.
+Both raise the same question.
+If a model can generate its own problems and verify them, can it train on them and reach the performance of externally curated benchmarks?
 
-An alternative is self-generation.
-Absolute Zero Reasoner (AZR)~\citep{zhao2025azr} trains proposer and solver networks on self-generated problems with verifiable answers, reporting reasoning gains without curated training data.
-The Darwin G{\"o}del Machine (DGM)~\citep{zhang2025dgm} frames self-improvement at the agent level: a language-model agent modifies its own code and retains variants that score higher on a held-out task distribution.
-Both lines raise a natural question: \emph{how far can self-generation go?}
-If a model can generate its own problems and verify them, can it train on them and match the performance of externally curated benchmarks---or beyond?
+We examine the question at a scale where the machinery is instrumentable: Qwen3-8B~\citep{qwen3} as the base model, HumanEval as the held-out evaluation.
+The reference point is GRPO on curated problems: applied to Qwen3-8B with 664 problems from HumanEval and MBPP, GRPO raises pass@1 from 63.4\% to 84.1\% (official HuggingFace fp16 evaluator, +34 problems solved, 0 regressions).
+The empirical question is what happens when the same base model is given only its own generations and a Python interpreter as evaluator.
 
-We study this question at a deliberately modest scale where the mechanism can be instrumented directly (Qwen3-8B~\citep{qwen3} as base model, HumanEval as the held-out evaluation).
-Our starting point is that RLVR with GRPO on curated benchmarks works: on Qwen3-8B with hundreds of problems from HumanEval and MBPP, GRPO improves pass@1 from 63.4\% to 84.1\% (measured with the official HuggingFace fp16 evaluator, +34 problems solved, 0 regressions).
-The question is whether the same base model, given only its own generations and a Python interpreter as evaluator, can recover this gain.
+\paragraph{What works.}
+A generation-plus-calibration pipeline that keeps only problems the base model solves some of the time but not all of the time produces 33 usable problems from a pool of 1000 candidates.
+GRPO on those 33 problems raises pass@1 from 63.4\% to 76.8\%.
+That is 65\% of the 20.7-point improvement that the same training recipe extracts from 664 curated problems, at two orders of magnitude less training data.
+A second finding cuts across the whole result: the number of rollouts per prompt in GRPO, \texttt{num\_generations}, matters more than the number of prompts at this data volume.
+Moving \texttt{num\_generations} from 2 to 4 on identical data moves pass@1 by 6.7 points.
+Within-batch gradient-signal contrast is what is scarce on small curricula, not prompts.
 
-\paragraph{Findings, positive.}
-Partially, yes.
-A self-generation pipeline with calibration---retaining only problems the base model solves sometimes but not always---produces meaningful gains via GRPO: 63.4\% $\to$ 76.8\% pass@1 on HumanEval, using tens of generated problems and no external benchmarks.
-This captures roughly 65\% of the improvement obtained with hundreds of curated problems.
-A methodological refinement---doubling the within-batch contrast by increasing GRPO's \texttt{num\_generations}---provides most of the remaining gain at fixed data volume, suggesting that gradient-signal contrast dominates data volume for small curricula.
+\paragraph{What does not.}
+The approach fails to scale in three distinct ways, each with its own mechanism.
+Iteration does not accumulate.
+A second GRPO round trained on problems calibrated against the first-round checkpoint converges back to the checkpoint, because raising its pass rate on those problems to 1 is exactly what the training does.
+Task-type imbalance destroys transfer.
+A curriculum where 84\% of the calibrated problems are abduction-style---short scalar outputs---drops pass@1 on induction-style HumanEval to 61.0\%, below the pre-training baseline.
+The adapter learns to emit short outputs and loses the indentation prior that induction needs.
+Diversity in the curriculum regularizes; diversity concentrated in a single incompatible type is actively destructive.
+Finally, moving from Qwen3-8B (63.4\% base) to Qwen3-32B (89.0\% base) collapses the learnability window: less than 1\% of problems the 32B model generates are solved sometimes-but-not-always by itself, and 0\% of the problems it labels ``hard'' pass calibration.
+A generator-solver pair capable of producing well-formed verified problems is, by that same capability, able to solve them.
 
-\paragraph{Findings, negative.}
-The approach does not scale, in three distinct ways, each with a different mechanism.
-\textbf{(i) Iteration does not accumulate.}
-Once a checkpoint has been trained on its own calibrated curriculum, a second round trained on problems calibrated against that checkpoint fails to improve over it.
-The checkpoint dominates the problems it helped select.
-\textbf{(ii) Task-type imbalance destroys transfer.}
-When adversarial co-evolution of the curriculum shifts the task-type distribution---e.g., a pool with $\sim$84\% abduction-style problems---performance on the target inductive benchmark drops to 61.0\% pass@1, below the pre-training baseline of the calibration method.
-Diversity in the curriculum acts as a regularizer; diversity concentrated in a single incompatible type is actively destructive.
-\textbf{(iii) Self-generation becomes inapplicable at scale.}
-Moving from Qwen3-8B (63.4\% base) to Qwen3-32B (89.0\% base) collapses the learnability window.
-Less than 1\% of problems the 32B model generates are solved sometimes-but-not-always by itself; 0\% of problems it labels as ``hard'' pass calibration.
-A generator-solver pair capable of producing well-formed problems with verified solutions is also capable of solving them.
-
-\paragraph{What GRPO teaches, qualitatively.}
-A per-problem analysis of the trained checkpoint reveals that approximately 80\% of GRPO's improvement on calibrated problems is formatting---specifically, emitting correctly indented Python---rather than new reasoning capability.
-The remaining 20\% includes at least one case of genuine logical improvement (distinguishing datetime format strings from regex patterns).
-The common framing of RLVR as ``teaching the model to reason'' overstates the mechanism at this scale; ``teaching the model to present its reasoning in the evaluator's expected format'' is a more accurate description of most of what happens.
+\paragraph{What the adapter actually learns.}
+A per-problem inspection of the trained checkpoint separates format from reasoning.
+Of 29 problems calibrated against the trained adapter, the adapter outperforms the base on ten.
+Eight of those ten are formatting: the base writes code that would return the right answer if the interpreter accepted it, but places the body flush against the \texttt{def} line rather than indented, and the interpreter rejects the whole thing.
+The adapter reliably inserts the leading whitespace.
+One case is a genuine reasoning improvement: on \texttt{is\_valid\_date}, the base feeds the datetime format string through \texttt{re.fullmatch} and the \texttt{\%} characters break the match; the adapter skips the regex guard.
+The remaining case is inconclusive on resampling.
+The framing of RLVR at this scale as ``teaching the model to reason'' overstates what the adapter does.
+``Teaching the model to present its output in the evaluator's expected format'' describes most of the effect.
 
 \paragraph{The LAIMARK system.}
 The experiments of this paper sit inside a larger closed-loop system we call LAIMARK (Local AI Metacognitive Agent with Recursive Knowledge).
@@ -115,18 +123,18 @@ Figure~\ref{fig:loop} illustrates the full loop.
 
 \paragraph{Contributions.}
 \begin{enumerate}
-    \item We demonstrate that GRPO on self-generated calibrated problems recovers roughly 65\% of the gain of externally curated benchmarks on HumanEval with Qwen3-8B, with zero external problems (\S\ref{sec:main}).
-    \item We show that within-batch contrast in GRPO dominates data volume on small curricula: doubling \texttt{num\_generations} captures most of the remaining gain without additional data (\S\ref{sec:main}).
-    \item We document three structural limits of closed-loop self-evolution---iteration non-accumulation, task-type interference, and inapplicability at scale---each with its own mechanism and direct empirical evidence (\S\ref{sec:limits}).
-    \item We decompose GRPO's per-problem improvement into formatting ($\sim$80\%) and reasoning capability ($\sim$20\%), qualifying a common claim about what RLVR teaches (\S\ref{sec:formatting}).
-    \item We position LAIMARK as a closed-loop self-evolution system in which prompt evolution, weight update, self-refinement, and self-generated curricula run on a single base model, and characterize its differentiators from DGM / Hyperagents, DeepSeek-R1, and AZR along this four-component axis (\S\ref{sec:background-l2}, Fig.~\ref{fig:loop}).
+    \item A closed-loop GRPO pipeline with no external problem source recovers 65\% of the gain available from 664 curated problems on HumanEval with Qwen3-8B (\S\ref{sec:main}).
+    \item On small calibrated curricula, within-batch contrast (\texttt{num\_generations}) drives the result more than curriculum size; the precise mechanism---what fraction of training steps produce non-zero group advantage---is quantified in \S\ref{sec:main}.
+    \item Three structural limits of the closed loop: iteration does not accumulate across rounds; calibrated curricula with a dominant task type destroy transfer; and the learnability window empties once the generator is strong enough to solve what it can propose (\S\ref{sec:limits}).
+    \item A per-problem decomposition places most of GRPO's improvement at this scale in output formatting rather than in reasoning capability, qualifying a common claim about what RLVR teaches (\S\ref{sec:formatting}).
+    \item LAIMARK composes prompt evolution, weight update, self-refinement, and self-generated curricula into a closed-loop system on a single base model; Figure~\ref{fig:loop} and \S\ref{sec:background-l2} differentiate it from DGM / Hyperagents (agent-level code only), DeepSeek-R1 (weights only, curated), and AZR (weights plus self-generation, no prompt evolution).
 \end{enumerate}
 
 \paragraph{Scope.}
-This paper reports LAIMARK's components 2 and 4 in detail and components 1 and 3 as context necessary for interpreting the results.
-We do not study agent-level self-modification of the training code or reward function---the G{\"o}del-Machine~\citep{schmidhuber2003godel} direction or the Hyperagents~\citep{zhang2026hyperagents} direction---nor signal sources outside the model's distribution (external perception, physical environments, human feedback).
-Both are orthogonal extensions that the structural limits we document motivate directly; we discuss them in \S\ref{sec:discussion}.
-All experimental results reported use the official HuggingFace fp16 HumanEval evaluator.
+This paper covers LAIMARK's components 2 and 4 empirically; components 1 and 3 appear as context.
+Agent-level self-modification of the training code or reward function---the direction explored by the G{\"o}del Machine~\citep{schmidhuber2003godel} and by Hyperagents~\citep{zhang2026hyperagents}---is out of scope, as are signal sources outside the model's own output distribution (perception, physical environments, human feedback).
+The structural limits reported here motivate both directions as follow-ups, discussed in \S\ref{sec:discussion}.
+All reported pass@1 numbers use the official HuggingFace fp16 HumanEval evaluator.
 
 % ----- Figure 1: Closed-loop LAIMARK system --------
 \begin{figure}[t]
@@ -216,8 +224,7 @@ Given prompt $x$, the policy samples completions $\{y_k\}_{k=1}^G$, each receive
     \label{eq:grpo-adv}
 \end{equation}
 The gradient update is $\nabla_\theta \log \pi_\theta(y_k \mid x) \cdot A_k$, regularized by a KL term to a reference policy.
-Note that $A_k = 0$ for every rollout whenever all $r_k$ are equal.
-A prompt on which the policy always passes---or always fails---contributes nothing to training.
+When all $r_k$ are equal, $A_k$ is zero for every rollout in the group, and a prompt on which the policy always passes or always fails contributes nothing to training.
 
 \paragraph{The learnability window.}
 Useful training data for GRPO is not what the policy cannot solve; it is what the policy solves \emph{inconsistently}.
@@ -267,11 +274,10 @@ A variant of this effect appears independently in the prompts that Qwen3-8B gene
 The L2b prompt used throughout this paper instructs the model to (i) initialize result containers explicitly, (ii) iterate with explicit type-checking, (iii) maintain and update accumulators systematically, and (iv) verify outputs match expected types and constraints.
 The prompt is a frozen output of a prior evolution run; we do not claim to be rediscovering it here.
 
-One observation from the prompt-evolution phase matters for what follows.
-L2b does not add reasoning capability; it adds an \emph{output-distribution shift} that biases the model toward procedural, step-by-step code.
-Its effect depends on the model having procedural code underrepresented in its default output distribution.
-Section~\ref{sec:limits-scale} shows that Qwen3-32B, whose default distribution is already more procedural, loses 1.2 pass@1 points under L2b: the same prompt that improves 8B degrades 32B.
-This is the first datum in a pattern we document throughout: closed-loop RLVR at this scale produces output-distribution shaping, not capability acquisition (\S\ref{sec:formatting}).
+L2b does not add reasoning capability.
+It adds an output-distribution shift that biases the model toward procedural, step-by-step code, and its effect size depends on how underrepresented such code is in the model's default output distribution.
+Qwen3-32B, which already writes more procedural code by default, loses 1.2 pass@1 points under L2b (\S\ref{sec:limits-scale}).
+The same shift that helps the 8B model hurts the 32B model, which is the first instance of a pattern recurring through the rest of the paper: at this scale, RLVR and its prompt-level counterparts shape output distributions more than they grow capability (\S\ref{sec:formatting}).
 
 % ==========================================================
 \section{Self-Generation and Calibration Pipeline}
@@ -420,7 +426,7 @@ Both adapters move the model in the same direction; selfgen v2 has lower coverag
 The difference between selfgen v1 and v2 is the GRPO group size $G$: v1 uses $G = 2$, v2 uses $G = 4$, on identical data.
 Within-batch advantage (Eq.~\ref{eq:grpo-adv}) is zero whenever all $G$ rollouts of a prompt receive the same reward.
 At the training pass rates we observe ($\hat{p}(x) \approx 0.53$ mean across calibrated problems), moving from $G = 2$ to $G = 4$ changes the expected fraction of training steps with non-zero gradient from roughly $2\hat{p}(1-\hat{p}) \approx 0.50$ to $1 - \hat{p}^4 - (1-\hat{p})^4 \approx 0.88$.
-Empirically on v1 vs.\ v2, the fraction of training steps where the group was non-degenerate rose from approximately 30\% to approximately 80\%.
+Empirically, the fraction of non-degenerate training steps went from 30\% under $G=2$ to 80\% under $G=4$.
 The 6.7-point gap between v1 and v2 is substantially explained by this factor alone.
 
 A practical reading: at small curriculum sizes---tens of problems, not hundreds---$G$ has more leverage than adding more problems.
@@ -562,7 +568,7 @@ Hard (verified) & Qwen3-32B & 10 & 0 (0.0\%) \\
 \end{tabular}
 \end{table}
 
-The mechanism is direct: calibration requires $\hat{p}(x) \in [0.2, 0.8]$, and 32B's $\hat{p}(x)$ is approximately 1 on essentially every problem it formulates with a verified reference solution.
+The mechanism is direct: calibration requires $\hat{p}(x) \in [0.2, 0.8]$, and 32B's $\hat{p}(x)$ sits at or near 1 on nearly every problem it can formulate with a verified reference solution.
 A generator capable of producing well-formed problems \emph{with correct reference solutions} is, by that very capability, able to solve the problems it produces.
 The learnability window is not a difficulty-of-problem measure; it is a pass-rate measure under the target policy.
 When the generator and the target policy are the same model, and the generator's competence has grown, the window closes.
@@ -676,7 +682,7 @@ The lines of work are composable in principle---an agent-level loop could modify
 \paragraph{Prompt re-optimization after weight update (DGM-self).}
 LAIMARK's component 3 (\S\ref{sec:intro}) composes prompt evolution on top of a weight-updated checkpoint.
 In a separate experiment, we fed an earlier GRPO checkpoint of Qwen3-8B back into the prompt-evolution loop of \S\ref{sec:background-l2}, with that checkpoint serving both as the proposer of candidate system prompts and as the model evaluated under them.
-The run produced a refined system prompt that improved the checkpoint's pass@1 by approximately two points on a deployment-quantized evaluation setup that is not directly comparable to the HF fp16 harness used for the headline results of this paper.
+The refined prompt improved the checkpoint's pass@1 by about two points on a deployment-quantized evaluation setup; those numbers are not directly comparable to the HF fp16 harness used for the headline results here.
 We therefore do not fold the number into the main tables and do not claim DGM-self produces a specific pass@1 on HumanEval fp16.
 What the experiment does establish is that a weight update does not saturate the prompt-space improvements available from component~1: the optimal prompt after weight update differs from the optimal prompt before it, and the updated model is capable of finding the new optimum itself.
 The observation is consistent with the formatting-versus-capability decomposition of \S\ref{sec:formatting}: if weights primarily absorb output-formatting shifts, the remaining prompt-space gains are expected to shift rather than vanish.
