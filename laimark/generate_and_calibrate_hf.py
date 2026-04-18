@@ -297,7 +297,7 @@ def extract_docstring(prompt):
     return m.group(1).strip() if m else prompt
 
 
-def log(msg, logfile="/root/gen_calibrate.log"):
+def log(msg, logfile="./gen_calibrate.log"):
     print(msg, flush=True)
     with open(logfile, "a") as f:
         f.write(msg + "\n")
@@ -315,7 +315,7 @@ def main():
     parser.add_argument("--lo", type=float, default=0.2)
     parser.add_argument("--hi", type=float, default=0.8)
     parser.add_argument("--jaccard_threshold", type=float, default=0.6)
-    parser.add_argument("--output", default="/root/calibrated_selfgen.jsonl")
+    parser.add_argument("--output", default="./calibrated_selfgen.jsonl")
     parser.add_argument("--existing", default=None,
                         help="Existing generated_problems.jsonl to calibrate first")
     parser.add_argument("--adapter", default=None,

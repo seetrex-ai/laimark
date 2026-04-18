@@ -97,7 +97,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--adapter_path", required=True)
     parser.add_argument("--base_model", default=MODEL_ID)
-    parser.add_argument("--output", default="/root/eval_adapter_predictions.jsonl")
+    parser.add_argument("--output", default="./eval_adapter_predictions.jsonl")
     parser.add_argument("--no_adapter", action="store_true",
                         help="Evaluate base model without adapter (control)")
     parser.add_argument("--max_new_tokens", type=int, default=2048)

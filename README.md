@@ -4,17 +4,15 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![CI](https://github.com/seetrex-ai/laimark/actions/workflows/ci.yml/badge.svg)](https://github.com/seetrex-ai/laimark/actions)
 
-**Gains and structural limits of self-generated curricula in reinforcement learning from verifiable reward.**
-
-LAIMARK (Local AI Metacognitive Agent with Recursive Knowledge) is a closed-loop self-evolution system that composes four components on a single base model: prompt evolution, weight update via GRPO, self-refinement, and self-generated curricula. No external agent, judge, or human-in-the-loop at any stage.
+LAIMARK (Local AI Metacognitive Agent with Recursive Knowledge) studies whether a language model can generate its own training curriculum and improve via reinforcement learning from verifiable reward. Four things run on a single base model: a prompt-evolution loop, a GRPO weight update, prompt re-optimization on the updated weights, and a problem-generation step that feeds the next GRPO round. Nothing outside the model participates, other than the Python interpreter used to check that generated code passes its own tests.
 
 > **Paper:** [LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward](paper/Laimark.pdf) (April 2026)
 
 ## What this is
 
-RLVR systems like [DeepSeek-R1](https://arxiv.org/abs/2501.12948) improve base models on reasoning benchmarks using curated external problems with automatic evaluators. LAIMARK asks whether the same gain can be obtained with the model generating its own problems.
+[DeepSeek-R1](https://arxiv.org/abs/2501.12948) and related RLVR systems improve base models using curated external problem sets paired with automatic evaluators. We ask what happens when the problem set comes from the model itself.
 
-Results on HumanEval with Qwen3-8B (official HuggingFace fp16 harness):
+On HumanEval with Qwen3-8B (HuggingFace fp16 harness):
 
 | Configuration | External problems | pass@1 |
 |---|---|---|
@@ -22,13 +20,9 @@ Results on HumanEval with Qwen3-8B (official HuggingFace fp16 harness):
 | **GRPO, self-generated (G=4)** | **0** | **76.8%** |
 | GRPO, curated (HumanEval + MBPP) | hundreds | 84.1% |
 
-Self-generation with calibration recovers roughly two thirds of the curated-benchmark improvement using training data two orders of magnitude smaller.
+Self-generation with calibration captures about 65% of the curated-benchmark gain on two orders of magnitude less data.
 
-The paper also documents three structural limits that cap this approach:
-
-1. **Iteration does not accumulate.** A second GRPO round on problems calibrated against the first-round checkpoint fails to improve over it.
-2. **Task-type imbalance destroys transfer.** A curriculum dominated by abduction-style problems drops pass@1 to 61.0%, below the pre-training baseline.
-3. **Inapplicability at scale.** With Qwen3-32B (89.0% base pass@1 without training), less than 1% of self-generated problems pass the learnability-window filter — a generator capable enough to produce well-formed verified problems is also capable enough to solve them.
+Three limits cap this approach. First, iteration does not accumulate: a second GRPO round trained on problems calibrated against the first-round checkpoint converges back to it. Second, a curriculum dominated by a single task type (for example, 84% abduction-style problems) drops pass@1 to 61.0% — below the pre-training baseline — by shifting the output-format prior in a direction that misfits HumanEval. Third, at 32B parameters the learnability window closes entirely: the base model already solves nearly every problem it can formulate with a verified reference solution, so the selection criterion has nothing to accept.
 
 ## Repository structure
 
@@ -78,7 +72,7 @@ python laimark/train_grpo.py --selfgen_only --num_generations 4 --epochs 2
 python laimark/eval_adapter.py --adapter grpo_output/final
 ```
 
-The `--num_generations 4` flag is the single most consequential hyperparameter at small curriculum sizes (see paper §4); halving it to 2 drops the result by roughly 7 pass@1 points on the same data.
+`--num_generations` drives the result at small data volumes (paper §4). On the same 33-problem curriculum, moving from 2 to 4 gains 6.7 pass@1 points; adding more problems at `G=2` does less.
 
 ## Reproducing the paper's main numbers
 
@@ -97,9 +91,7 @@ Trained LoRA adapters and raw output logs are not committed — the pipeline reg
 ## Safety
 
 > [!WARNING]
-> This repository executes untrusted, model-generated Python code in a subprocess-based sandbox with a 5-second timeout.
-> The sandbox is sufficient for HumanEval-style benchmarks but is not a hardened isolation boundary against adversarial payloads.
-> Run the pipeline in a Docker container, a disposable VM, or a sandboxed user account on a machine without sensitive data or privileged network access.
+> The pipeline runs model-generated Python code in a subprocess with a 5-second timeout. The sandbox does not block filesystem, network, or environment access from the executed code. Run inside a container or disposable VM; see [SECURITY.md](SECURITY.md).
 
 ## Citation
 

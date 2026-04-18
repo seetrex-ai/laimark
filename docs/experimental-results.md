@@ -7,9 +7,9 @@ See the [paper](../paper/laimark.tex) for full methodology and discussion.
 
 ## 1. Main Result
 
-GRPO on self-generated calibrated problems recovers roughly two thirds of
-the gain from GRPO on externally curated benchmarks, with training data
-two orders of magnitude smaller.
+GRPO on 33 self-generated calibrated problems reaches 76.8% pass@1 — about
+65% of the 20.7-point gain that the same GRPO run produces on 664 curated
+problems from HumanEval and MBPP.
 
 | Configuration | External problems | $G$ | Pass@1 | Gain captured |
 |---|---|---|---|---|
@@ -42,9 +42,12 @@ Measured: approximately 30% for $G{=}2$, approximately 80% for $G{=}4$.
 | 2a (from base, problems calibrated against v2) | Qwen3-8B base | 65.2% |
 | 2b (from v2 merged, problems calibrated against v2) | v2 | 76.8% |
 
-Round 2b matches v2 exactly: the checkpoint dominates the curriculum its
-own calibration selected. Further rounds do not accumulate improvement in
-a closed system.
+Round 2b lands on 76.8%, identical to its starting checkpoint. Training on
+problems chosen for sitting in v2's learnability window raises v2's pass
+rate on those problems to 1, and leaves the rest untouched. A second
+generation pass with v2 as proposer produces 1.7% survival against the
+same criterion — the window is shrinking faster than the curriculum can
+refill it.
 
 ### 3.2 Task-type imbalance destroys transfer
 
@@ -77,8 +80,10 @@ Self-generation pipeline acceptance rates at 32B:
 | Medium (verified) | Qwen3-8B | 236 | 2 (0.85%) |
 | Hard (verified) | Qwen3-32B | 10 | 0 (0%) |
 
-The learnability window closes: a generator capable of producing well-formed
-verified problems is also capable of solving them.
+The learnability window is empty at 32B. A model that can formulate a
+problem with a working reference solution is already, by that capability
+alone, strong enough to solve it — so the pass rate on self-generated
+candidates sits at 1.
 
 ## 4. Formatting vs. Capability
 
@@ -99,12 +104,13 @@ Decomposition of the 10 v2-wins by mechanism:
 | Genuine logic improvement | 1 |
 | Inconclusive on re-sampling | 1 |
 
-Approximately 80% of GRPO's improvement on calibrated problems is
-emission of correctly indented Python, not new reasoning capability.
-The one genuine logic improvement is on `is_valid_date`, where v2
-distinguishes datetime format strings from regex patterns (the base
-model passes the format string through `re.fullmatch`, which fails on
-the `%` characters).
+Eight of the ten v2 wins are cases where the base model writes correct
+code with broken indentation — the interpreter rejects it before checking
+whether the logic works. v2 emits the same code with the leading
+whitespace the function expects. One case is genuinely new behaviour:
+on `is_valid_date`, the base model calls `re.fullmatch(format_str, ...)`
+and the `%` characters in `"%Y-%m-%d"` make the match fail; v2 skips the
+regex step and passes the format string to `strptime` directly.
 
 ## 5. Reproduction Commands
 

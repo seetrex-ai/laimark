@@ -1,20 +1,14 @@
 LAIMARK
 Copyright 2026 Jesús Tabares Montilla
 
-This product includes software derived from the Darwin Gödel Machine (DGM)
-project by Jenny Zhang, Shengran Hu, Cong Lu, Robert Lange, and Jeff Clune,
-originally distributed under the Apache License 2.0
-(https://github.com/jennyzzt/dgm).
+Portions of this repository derive from the Darwin Gödel Machine (DGM)
+project by Jenny Zhang, Shengran Hu, Cong Lu, Robert Lange, and Jeff
+Clune, originally distributed under the Apache License 2.0:
 
-The code inherited from DGM has been largely removed or replaced in the
-current working tree of this repository. The inherited components that
-remained at the time of public release, and their upstream origins, are:
+  https://github.com/jennyzzt/dgm
 
-  - Initial repository scaffolding and build configuration
-  - Evolution-loop concepts adapted for LAIMARK's prompt-evolution phase
-
-All files originally authored under the DGM project retain the upstream
-copyright and Apache 2.0 license terms; see LICENSE for the full text.
-
-Modifications and new files authored for LAIMARK are copyright the LAIMARK
-authors and are released under the same Apache 2.0 license.
+Most of the DGM code has been removed or replaced; what remains in this
+tree is repository scaffolding and a small number of evolution-loop
+concepts that LAIMARK adapted for its prompt-evolution phase. Those
+files retain their upstream copyright and are covered by the same
+Apache 2.0 license that governs the rest of this repository (LICENSE).
