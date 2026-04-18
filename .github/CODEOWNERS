@@ -1,0 +1,10 @@
+# Changes to the training curriculum and to executable code require
+# review by the project owner. The reward function in train_grpo.py
+# runs the `tests` field of every problem in data/ via exec(); any
+# modification to these paths is a potential RCE surface.
+
+/data/          @seetrex-ai
+/laimark/       @seetrex-ai
+/paper/         @seetrex-ai
+/.github/       @seetrex-ai
+/pyproject.toml @seetrex-ai
