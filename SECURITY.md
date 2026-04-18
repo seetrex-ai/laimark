@@ -10,9 +10,8 @@
 
 If you discover a security vulnerability, please report it responsibly:
 
-- **GitHub Security Advisory**: use the "Report a vulnerability" button under the Security tab of this repository (preferred channel).
 - **Email**: research@seetrex.com
-- **Expected response**: Within 72 hours
+- **Expected response**: within 72 hours
 - **Please do NOT** open a public GitHub issue for security vulnerabilities.
 
 ## Untrusted Code Execution
