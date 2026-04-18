@@ -3,10 +3,11 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue)](https://github.com/seetrex-ai/laimark)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![CI](https://github.com/seetrex-ai/laimark/actions/workflows/ci.yml/badge.svg)](https://github.com/seetrex-ai/laimark/actions)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19639751.svg)](https://doi.org/10.5281/zenodo.19639751)
 
 LAIMARK (Local AI Metacognitive Agent with Recursive Knowledge) studies whether a language model can generate its own training curriculum and improve via reinforcement learning from verifiable reward. Four things run on a single base model: a prompt-evolution loop, a GRPO weight update, prompt re-optimization on the updated weights, and a problem-generation step that feeds the next GRPO round. Nothing outside the model participates, other than the Python interpreter used to check that generated code passes its own tests.
 
-> **Paper:** [LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward](paper/Laimark.pdf) (April 2026)
+> **Paper:** [LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward](paper/Laimark.pdf) (April 2026) · [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19639751.svg)](https://doi.org/10.5281/zenodo.19639751)
 
 ## What this is
 
@@ -110,11 +111,12 @@ Trained LoRA adapters are not committed. Re-running the pipeline with `--seed 42
 
 ```bibtex
 @article{tabares2026laimark,
-  title = {LAIMARK: Gains and Structural Limits of Self-Generated Curricula
-           in Reinforcement Learning from Verifiable Reward},
+  title  = {LAIMARK: Gains and Structural Limits of Self-Generated Curricula
+            in Reinforcement Learning from Verifiable Reward},
   author = {Tabares Montilla, Jes{\'u}s},
-  year = {2026},
-  url = {https://github.com/seetrex-ai/laimark}
+  year   = {2026},
+  doi    = {10.5281/zenodo.19639751},
+  url    = {https://doi.org/10.5281/zenodo.19639751}
 }
 ```
 
