@@ -50,5 +50,3 @@ output_*/
 *.jsonl
 laimark/*_results.json
 
-# Paper build artifacts (compile in Overleaf)
-paper/*.pdf

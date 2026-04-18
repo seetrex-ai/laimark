@@ -8,7 +8,7 @@
 
 LAIMARK (Local AI Metacognitive Agent with Recursive Knowledge) is a closed-loop self-evolution system that composes four components on a single base model: prompt evolution, weight update via GRPO, self-refinement, and self-generated curricula. No external agent, judge, or human-in-the-loop at any stage.
 
-> **Paper:** [LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward](paper/laimark.tex) (April 2026)
+> **Paper:** [LAIMARK: Gains and Structural Limits of Self-Generated Curricula in Reinforcement Learning from Verifiable Reward](paper/Laimark.pdf) (April 2026)
 
 ## What this is
 
